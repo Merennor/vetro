@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 — unreleased
+
+- **Launcher and Home order on the 2022 TVs with the new Home** (issues #22 and #25): on a UE65BU8002KXXH and a QE75QN85BATXXU (both firmware 1720.7), turning the Launcher on failed with *The Home row is empty or unreadable*. These TVs ship the new Home (`com.samsung.tv.home.media`, `home.sidebar`, `coba.newhome`) and keep the Home order cache (`.appLayerCache.1` and `.2`) in `com.samsung.tv.home.media/data`, not in `com.samsung.tv.csfs/data`. Vetro now uses the first of the two folders that holds a cache file, `csfs` first, so nothing changes where it worked. The Home order tool (reorder, restore) had the same path built in and gets the same fix. Tested against real folders in all four layouts (`csfs` only, `home.media` only, both, neither); not tried on a TV with the new Home. Thanks to the reporter of #22, who found the folder.
+- **Compatibility:** community report from a Samsung UE65BU8002KXXH (2022, firmware T-KSU2EBDEUC-1720.7) on Vetro 0.3.0 (issue #22): service and UID-0 root agent running; the Launcher needed the fix above. Community report from a QE75QN85BATXXU (2022, firmware 1720.7) on Vetro 0.3.0 (issue #25): core functions work, the Launcher failed for the same reason. Report from a Samsung Smart Monitor M8 LS32BM801UNXGO (firmware T-PTMWWC-1720.7, issue #15): service and root agent running, what works not reported yet.
+
 ## 0.3.0 — 2026-10-25
 
 - **Port clash** (issue #16): the port is no longer fixed at 8099. `VETRO_PORT=9000 node build.cjs` (in `app/` or `rooting/`) writes the port into the widget's access origin, the probe page and the service, so Vetro can sit beside an app that already uses 8099 (tizen-youtube). The default and the default package are unchanged; a port outside 1024–65535, or 8001/8002 (used by the TV's remote sockets), is refused. It is a build-time choice, not a setting on the TV. Not tried on a TV.
