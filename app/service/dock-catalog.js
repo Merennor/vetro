@@ -1,7 +1,7 @@
 'use strict';
 // The dock's app list, built from what Samsung's own Home reads, so the two start out the same:
-//   - the Home row order       .../apps_rw/com.samsung.tv.csfs/data/.appLayerCache.1 (or .2); the 2022 TVs with the new
-//                              Home (com.samsung.tv.home.media) keep it in that package's data dir instead
+//   - the Home row order       .../apps_rw/com.samsung.tv.csfs/data/.appLayerCache.1 (or .2); TVs with the new Home
+//                              (com.samsung.tv.home.media, 2022 and later) keep it in that package's data dir instead
 //   - the web app registry     /opt/dbspace/.webappservice.db     (title and Tizen app id)
 //   - the registry's icons     /opt/share/webappservice/apps_icon/all/<id>/
 //   - the package icons        /opt/dbspace/.pkgmgr_parser.db     (sideloaded apps, TV Plus)

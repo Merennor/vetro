@@ -1,6 +1,6 @@
 'use strict';
 // The Home order cache lives in com.samsung.tv.csfs/data on most TVs and in com.samsung.tv.home.media/data on the
-// 2022 TVs with the new Home (issues #22 and #25). The generated shell scripts run here against real temp folders.
+// TVs with the new Home (issues #22 and #25, pull requests #20 and #23). The generated shell scripts run here against real temp folders.
 const assert = require('assert').strict, fs = require('fs'), os = require('os'), path = require('path'), cp = require('child_process');
 const homeOrder = require('../service/home-order.js'), catalog = require('../service/dock-catalog.js');
 const CSFS = '/opt/usr/home/owner/apps_rw/com.samsung.tv.csfs/data';
@@ -40,7 +40,7 @@ function dockOrder(l) {
         assert.deepEqual(dockOrder(l), ['s/livetv@RF', 'd/webapp@legacy', 'd/webapp@other']);
         assert.deepEqual((await new homeOrder.Order(execute(l)).read()).entries, ['s/livetv@RF', 'd/webapp@legacy', 'd/webapp@other']);
 
-        // home.media only: the 2022 TVs with the new Home
+        // home.media only: the TVs with the new Home
         l = layout({home: FILE('newhome')}); made.push(l.root);
         assert.deepEqual(dockOrder(l), ['s/livetv@RF', 'd/webapp@newhome', 'd/webapp@other'], 'the dock reads the new Home cache');
         const order = new homeOrder.Order(execute(l));

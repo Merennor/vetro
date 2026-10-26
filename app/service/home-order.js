@@ -1,7 +1,7 @@
 'use strict';
 
 // Home app order: the ordered list stored in the CoBA ".appLayerCache" file
-// under the csfs data dir (or the home.media one on the 2022 TVs with the new Home). Each line is a section item:
+// under the csfs data dir (or the home.media one on TVs with the new Home). Each line is a section item:
 //   s/livetv@<source>        live TV source (TV Plus, RF, ...)
 //   d/webapp@<packageId|storeId>  web application
 // The file shape is: <version>\n<entries...>\nEOFC OBA\n. The Home reads it to
