@@ -1,6 +1,8 @@
 'use strict';
 // Vetro application: telemetry, dashboard and feature endpoints.
 // Platform operations use the adapter documented in PLATFORM.md.
+// Tizen 5.5 runs Node 4.4: add the built-ins it lacks before anything else loads.
+require('./compat.js').install();
 var fs = require('fs');
 var http = require('http');
 var os = require('os');
