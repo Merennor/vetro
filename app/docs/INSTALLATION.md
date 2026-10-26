@@ -25,7 +25,11 @@ Expect the whole thing to need a computer with Tizen Studio and a certificate, a
 
 ### 1. Check requirements
 
-Use only a TV you own or are authorized to administer. Read the compatibility table first. Install Tizen Studio's TV extension and Samsung Certificate Extension from the official tools. Create your own author/distributor certificate profile bound to your TV. The integration's on-boot service has been investigated with Partner-level distribution privileges; ordinary public signing is not evidence that boot execution is supported.
+Use only a TV you own or are authorized to administer. Read the compatibility table first.
+
+Tizen Studio has been deprecated in favor of the Tizen Extension for VSCode. The last Tizen Studio release is available [here](https://download.tizen.org/sdk/Installer/tizen-studio_6.1/). You'll want the installer starting with `web-ide_` for your platform.
+
+Install Tizen Studio's TV extension and Samsung Certificate Extension from the official tools. Create your own author/distributor certificate profile bound to your TV. The integration's on-boot service has been investigated with Partner-level distribution privileges; ordinary public signing is not evidence that boot execution is supported.
 
 Do not reuse someone else's signed package or certificates. Historical signing material is excluded from the release. Review [Samsung's TV-device setup guide](https://developer.samsung.com/smarttv/develop/getting-started/using-sdk/tv-device.html) for your model's installation workflow.
 
