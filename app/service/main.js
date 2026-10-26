@@ -520,7 +520,9 @@ function restoreInput(){
     inputRestoring=true;
     physical.inventory().then(function(list){
         if(inputPaused||inputPreference()!==preference)return;
-        var device=list.find(function(d){return d.selectable&&d.name===preference.device&&(d.unique||d.node===preference.node);});
+        var candidates=list.filter(function(d){return d.selectable&&d.name===preference.device;});
+        var keyed=candidates.filter(function(d){try{return /[1-9a-f]/i.test(require('fs').readFileSync('/sys/class/input/'+d.node.split('/').pop()+'/device/capabilities/key','utf8'));}catch(e){return false;}});
+        var device=candidates.length===1?candidates[0]:keyed.length===1?keyed[0]:null;
         if(!device)throw new Error('Saved physical remote is unavailable');
         return physical.start(device.node,'filter',inputTokens());
     }).then(function(){inputError=null;}).catch(function(e){inputError=e.message;}).finally(function(){inputRestoring=false;});
