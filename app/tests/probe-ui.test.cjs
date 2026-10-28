@@ -11,7 +11,7 @@ const GOOD = {version: '0.3.5', port: 8099, address: '192.168.1.42', root: {mode
 
 // screen: the /screen body (null: the service answers nothing); probeResponse: the /probe reply.
 async function run(options) {
-  const o = Object.assign({probeResponse: {ok: true, persisted: true}, screen: GOOD, failFetch: null, appVersion: '0.3.5'}, options || {});
+  const o = Object.assign({probeResponse: {ok: true, persisted: true}, screen: GOOD, failFetch: null, appVersion: '0.3.5', hangLaunch: false}, options || {});
   const sent = [], timers = [], listeners = {}, windowListeners = {}, exits = [], launched = [];
   const screen = {innerHTML: ''}, stage = {style: {}};
   function XHR() {}
@@ -36,7 +36,7 @@ async function run(options) {
     fetch: async () => { if (o.failFetch && o.failFetch.n-- > 0) throw new Error('refused'); return {status: 200}; },
     tizen: {
       tvinputdevice: {getSupportedKeys: () => [{name: 'VolumeUp'}]},
-      application: {launch: (id, ok) => { launched.push(id); ok(); }, getAppsInfo: ok => ok([{id: 'vetrotvapp.app', packageId: 'vetrotvapp'}]),
+      application: {launch: (id, ok) => { launched.push(id); if (!o.hangLaunch) ok(); }, getAppsInfo: ok => ok([{id: 'vetrotvapp.app', packageId: 'vetrotvapp'}]),
         getCurrentApplication: () => ({exit: () => exits.push(1), appInfo: {version: o.appVersion}})},
       package: {getPackagesInfo: ok => ok([{id: 'vetrotvapp', version: '0.1.0'}])},
       systeminfo: {getPropertyValue: (name, ok) => ok({model: 'TV'})}
@@ -44,10 +44,11 @@ async function run(options) {
     btoa: s => Buffer.from(s).toString('base64'), clearTimeout,
     setTimeout: (f, ms) => { if (ms === 1500) { setImmediate(f); return 0; } timers.push({f, ms}); return timers.length; }
   };
-  await vm.runInNewContext(script, context);
+  vm.runInNewContext(script, context);   // its value is the page's run() promise, which a stuck call leaves pending
   // run() is not awaited by the page: let its promise chain settle.
   for (let i = 0; i < 40; i++) await new Promise(r => setImmediate(r));
-  return {sent, timers, exits, launched, listeners, windowListeners, screen, stage, context};
+  const settle = async () => { for (let i = 0; i < 40; i++) await new Promise(r => setImmediate(r)); };
+  return {settle, sent, timers, exits, launched, listeners, windowListeners, screen, stage, context};
 }
 const key = (r, keyCode) => r.listeners.keydown({keyCode});
 
@@ -122,5 +123,24 @@ const key = (r, keyCode) => r.listeners.keydown({keyCode});
   leaving.context.document.hidden = true;
   leaving.listeners.visibilitychange();
   assert.equal(leaving.exits.length, 1, 'a delivered page leaves when the user goes elsewhere');
+  // A Tizen call that never answers must not keep the screen on "Checking": its probe times out and the rest goes on.
+  const hung = await run({hangLaunch: true});
+  assert.ok(hung.screen.innerHTML.includes('Checking'), 'still waiting for the stuck call');
+  const limit = hung.timers.find(t => t.ms === 8000);
+  assert.ok(limit, 'every probe has a time limit');
+  limit.f();
+  await hung.settle();
+  const report = hung.sent.find(s => s.method === 'POST').body;
+  assert.equal(report.probe.serviceLaunch.ok, false);
+  assert.ok(/no answer/.test(report.probe.serviceLaunch.error));
+  assert.equal(report.probe.serviceReach.ok, true, 'the probes after the stuck one still run');
+  assert.ok(!hung.screen.innerHTML.includes('Checking'), 'the screen leaves the waiting state');
+  // While the checks run the screen says what it is doing: placeholders for each check, a turning ring, a step counter.
+  const waiting = await run({hangLaunch: true});
+  assert.ok(waiting.screen.innerHTML.includes('class="c wait"'), 'one placeholder per check while waiting');
+  assert.ok(waiting.screen.innerHTML.includes('Root access'));
+  assert.ok(waiting.screen.innerHTML.includes('Vetro is checking the TV'));
+  assert.ok(!waiting.screen.innerHTML.includes('Asking for help') || !waiting.screen.innerHTML.includes('SVC'), 'no verdict while waiting');
+  assert.ok(/<style>[\s\S]*@keyframes spin/.test(html), 'the waiting ring turns');
   console.log('PASS TV screen: probe report kept, healthy/limited/failed/down states, PIN slot hidden, Back/OK/idle');
 })().catch(e => {console.error(e); process.exitCode = 1;});

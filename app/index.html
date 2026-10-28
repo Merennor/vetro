@@ -23,6 +23,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .state.warn{border-color:var(--warn-line);background:var(--warn-soft);color:var(--warn)}
 .state.bad{border-color:var(--bad-line);background:var(--bad-soft);color:var(--bad)}
 .state.wait{border-color:var(--border);background:transparent;color:var(--muted)}
+/* The one moving thing: a slowly turning dashed ring while the checks run, so a quiet screen does not look stuck. */
+@keyframes spin{to{transform:rotate(360deg)}}
+.state.wait svg,.c.wait .ic{animation:spin 2.4s linear infinite}
 .dash{margin-left:auto;align-self:stretch;display:flex;flex-direction:column;justify-content:center;width:760px;padding:28px 36px;border-radius:16px;background:var(--surface);border:2px solid var(--border)}
 .dh{display:flex;align-items:baseline}
 .dh small{font-size:22px;letter-spacing:.12em;color:var(--muted)}
@@ -44,6 +47,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .c.warn{background:var(--warn-soft);border-color:var(--warn-line)}
 .c.bad{background:var(--bad-soft);border-color:var(--bad-line)}
 .c.na{opacity:.6}
+.c.wait{background:transparent;border-color:var(--border)}.c.wait .v{color:var(--muted);font-weight:400}
 .ic{flex:none;width:40px;height:40px;margin-right:18px}
 .n{font-size:26px;line-height:1.2;color:var(--muted)}
 .v{margin-top:2px;font-size:30px;line-height:1.2;font-weight:500}
@@ -68,12 +72,15 @@ var report = {probe: {}, apps: [], packages: [], settings: {}};
 var delivered = false, running = false, idleTimer = null;
 // The service keeps running without this page; a resident page only holds memory.
 function leave() { try { tizen.application.getCurrentApplication().exit(); } catch (e) {} }
-function attempt(name, fn) {
+// Every probe gets a time limit: a Tizen call whose callback never fires must not leave the screen on "Checking".
+function attempt(name, fn, limit) {
   return new Promise(function (resolve) {
+    var done = false, timer = setTimeout(function () { finish({ok: false, error: 'no answer in ' + Math.round(limit / 1000) + ' s'}); }, limit || 8000);
+    function finish(r) { if (done) return; done = true; clearTimeout(timer); report.probe[name] = r; resolve(); }
     try {
-      Promise.resolve(fn()).then(function (v) { report.probe[name] = {ok: true, value: v}; resolve(); },
-        function (e) { report.probe[name] = {ok: false, error: String(e && e.message || e)}; resolve(); });
-    } catch (e) { report.probe[name] = {ok: false, error: String(e && e.message || e)}; resolve(); }
+      Promise.resolve(fn()).then(function (v) { finish({ok: true, value: v}); },
+        function (e) { finish({ok: false, error: String(e && e.message || e)}); });
+    } catch (e) { finish({ok: false, error: String(e && e.message || e)}); }
   });
 }
 // A public-level certificate may not get the on-boot start honored, so the page starts the service itself.
@@ -149,7 +156,7 @@ var jobs = [
       return Object.keys(report.settings).length; }],
   ['systeminfoBattery', function () { return cb(function (ok, ko) { tizen.systeminfo.getPropertyValue('BUILD', ok, ko); }); }],
   ['remoteApi8001', function () { return tryConnect(8001); }],
-  ['serviceReach', function () { return reach(8); }]
+  ['serviceReach', function () { return reach(8); }, 25000]
 ];
 
 // ---- the screen -------------------------------------------------------------------------------------------
@@ -204,15 +211,16 @@ function checks(d) {
 }
 
 function cell(c) {
-  var cls = c[0] === 'bad' || c[0] === 'warn' || c[0] === 'na' ? ' ' + c[0] : '';
+  var cls = c[0] === 'bad' || c[0] === 'warn' || c[0] === 'na' || c[0] === 'wait' ? ' ' + c[0] : '';
   var value = esc(c[2]) + (c[3] && c[0] === 'ok' ? ' <span>&middot; ' + c[3] + '</span>' : '');
   return '<div class="c' + cls + '">' + ICONS[c[0]] + '<div><div class="n">' + esc(c[1]) + '</div><div class="v">' + value + '</div>' +
     (c[3] && c[0] !== 'ok' ? '<div class="h">' + c[3] + '</div>' : '') + '</div></div>';
 }
 
+var WAITING = [['Service', 'Starting'], ['Root access', 'Checking'], ['Remote input', 'Checking'], ['Launcher', 'Checking'], ['TV APIs', 'Checking'], ['Memory', 'Checking']];
 function render(d, waiting) {
-  var list = waiting ? [] : checks(d), bad = 0, warn = 0, state, label, sum, device = report.settings, model, firmware, line, version, pin = d && typeof d.pin === 'string' ? d.pin : '';
-  list.forEach(function (c) { if (c[0] === 'bad') bad++; else if (c[0] === 'warn') warn++; });
+  var list = waiting ? WAITING.map(function (w) { return ['wait', w[0], w[1], null, '']; }) : checks(d), bad = 0, warn = 0, state, label, sum, device = report.settings, model, firmware, line, version, pin = d && typeof d.pin === 'string' ? d.pin : '';
+  list.forEach(function (c) { if (waiting) return; if (c[0] === 'bad') bad++; else if (c[0] === 'warn') warn++; });
   if (waiting) { state = 'wait'; label = 'Checking'; sum = 'Checking'; }
   else if (!d) { state = 'bad'; label = 'Not responding'; sum = 'The service is down'; }
   else if (bad) { state = 'bad'; label = 'Needs attention'; sum = bad + (bad === 1 ? ' problem' : ' problems'); }
@@ -222,7 +230,7 @@ function render(d, waiting) {
   model = device.realModel || device.model;
   firmware = device.firmware ? String(device.firmware).split('-').pop() : null;   // T-NKM2DEUC-2310.0 -> 2310.0
   line = [esc('V' + (version || '?'))].concat(model ? [esc(model + (firmware ? ' ' + firmware : ''))] : []);
-  list.forEach(function (c) { line.push(c[5] ? '<em' + (c[5] === 'warn' ? ' class="w"' : '') + '>' + esc(c[4]) + '</em>' : esc(c[4])); });
+  if (!waiting) list.forEach(function (c) { line.push(c[5] ? '<em' + (c[5] === 'warn' ? ' class="w"' : '') + '>' + esc(c[4]) + '</em>' : esc(c[4])); });
   var addr = d && d.address ? 'http://' + d.address + ':' + d.port : null;
   var cells = '';
   list.forEach(function (c) { cells += cell(c); });
@@ -232,10 +240,10 @@ function render(d, waiting) {
     '</div><div class="state ' + (state === 'ok' ? '' : state) + '">' + ICONS[state] + esc(label) + '</div></div>' +
     '<div class="dash"><div class="dh"><small>DASHBOARD</small><div class="pin" id="pin"' + (pin ? '' : ' hidden') + '>PIN<b>' + esc(pin) + '</b></div></div>' +
     '<div class="url' + (addr ? '' : ' off') + '">' + (addr ? esc(addr) : 'Address unavailable') + '</div>' +
-    '<p>' + (addr ? 'Open it on a phone or computer on the same network.' : waiting ? 'Looking for the service.' : 'Dashboard at <code>http://&lt;TV&gt;:8099/</code> once the service answers (use the TV address from your router).') + '</p></div></div>' +
-    '<div class="panel ' + (bad ? 'bad' : warn ? 'warn' : '') + '"><div class="ph"><h2>Diagnostics</h2><div class="sum ' + (state === 'ok' ? '' : state) + '">' + esc(sum) + '</div></div>' +
+    '<p>' + (addr ? 'Open it on a phone or computer on the same network.' : waiting ? 'Vetro is checking the TV. The address appears in a few seconds.' : 'Dashboard at <code>http://&lt;TV&gt;:8099/</code> once the service answers (use the TV address from your router).') + '</p></div></div>' +
+    '<div class="panel ' + (bad ? 'bad' : warn ? 'warn' : '') + '"><div class="ph"><h2>Diagnostics</h2><div class="sum ' + (state === 'ok' ? '' : state) + '" id="sum">' + esc(sum) + '</div></div>' +
     '<div class="grid">' + cells + '</div>' +
-    '<div class="share"><div class="t">Asking for help? Read out or photograph this line.</div><code>' + line.join(' &middot; ') + '</code></div>' +
+    '<div class="share"><div class="t">Asking for help? Read out or photograph this line.</div><code>' + (waiting ? 'Collecting the details&hellip;' : line.join(' &middot; ')) + '</code></div>' +
     '<div class="keys"><span><i>OK</i>Check again</span><span><i>Back</i>Close</span></div></div>';
 }
 function fit() {
@@ -248,12 +256,17 @@ function resetIdle() {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(leave, IDLE_MS);
 }
+// Shows how far the checks are, so a slow TV reads as working and not as stuck.
+function progress(n) {
+  var el = document.getElementById('sum');
+  if (el) el.textContent = 'Checking ' + n + ' of ' + jobs.length;
+}
 function run() {
   if (running) return Promise.resolve();
   running = true; delivered = false;
   report = {probe: {}, apps: [], packages: [], settings: {}};
   render(null, true);
-  return jobs.reduce(function (p, j) { return p.then(function () { return attempt(j[0], j[1]); }); }, Promise.resolve())
+  return jobs.reduce(function (p, j, i) { return p.then(function () { progress(i + 1); return attempt(j[0], j[1], j[2]); }); }, Promise.resolve())
     .then(function () { return sendReport().then(function () { delivered = true; }, function () {}); })
     .then(function () { return readScreen().catch(function () { return null; }); })
     .then(function (d) { render(d, false); }, function () { render(null, false); })
