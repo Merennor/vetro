@@ -76,7 +76,13 @@ Do what you want with the remote. Press a button, choose an app, and the button 
 
 ## Install
 
-Vetro needs root on the TV, which comes from a package you build and sign yourself: there is no signed installer to download. You enable Developer Mode, build and install the package (signed with your own Samsung certificate, or with a tool such as [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung), which two community reports used), set **Host PC IP** to `127.0.0.1` and restart. [Step by step →](app/docs/INSTALLATION.md)
+Vetro needs root on the TV. There are three ways to install it:
+
+- **1. Apps2Samsung (the fastest).** Vetro is in the catalog of [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung), the one-click installer for Samsung TVs by [PatrickSt1991](https://github.com/PatrickSt1991). It handles the certificate, the signing and the install for you. Thanks, Patrick!
+- **2. With a coding agent.** Let an AI coding agent with a terminal (for example Codex or Gemini CLI) follow the guide for you. Not Claude: its cybersecurity safeguards stop it on the root steps.
+- **3. Manual.** Tizen Studio, your own Samsung certificate, build, sign and install, step by step.
+
+Whichever way you choose, finish with the same two steps: **open Vetro once** on the TV, then set **Host PC IP** to `127.0.0.1` in Developer Mode and restart the TV. [Full guide for all three ways →](app/docs/INSTALLATION.md)
 
 The root comes from [Chris Ritsen's Samsung TV root research](https://github.com/chris-ritsen/samsung-tv-root) and works through TV-local SDB, so no computer needs to stay connected. Startup can take up to 90 seconds. This is experimental software: privileged changes can disrupt TV features, so read what a switch does before turning it on.
 
